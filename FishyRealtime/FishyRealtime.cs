@@ -217,19 +217,19 @@ namespace FishyRealtime
             SendOptions options = channelId == (byte)Channel.Reliable ? SendOptions.SendReliable : SendOptions.SendUnreliable;
 
             //Sometimes the segment isnt large enough
+            byte[] arr = segment.Array;
             if ((segment.Array.Length - 1) <= (segment.Offset + segment.Count))
             {
-                byte[] arr = segment.Array;
                 Array.Resize(ref arr, arr.Length + 1);
                 arr[arr.Length - 1] = channelId;
             }
             //If it is, just insert a new byte
             else
             {
-                segment.Array[segment.Offset + segment.Count] = channelId;
+                arr[segment.Offset + segment.Count] = channelId;
             }
 
-            segment = new ArraySegment<byte>(segment.Array, segment.Offset, segment.Count + 1);
+            segment = new ArraySegment<byte>(arr, segment.Offset, segment.Count + 1);
 
             //If we are host, 
             if (NetworkManager.IsHost)
@@ -254,19 +254,19 @@ namespace FishyRealtime
             SendOptions options = channelId == (byte)Channel.Reliable ? SendOptions.SendReliable : SendOptions.SendUnreliable;
 
             //Sometimes the segment isnt large enough
+            byte[] arr = segment.Array;
             if ((segment.Array.Length - 1) <= (segment.Offset + segment.Count))
             {
-                byte[] arr = segment.Array;
                 Array.Resize(ref arr, arr.Length + 1);
                 arr[arr.Length - 1] = channelId;
             }
             //If it is, just insert a new byte
             else
             {
-                segment.Array[segment.Offset + segment.Count] = channelId;
+                arr[segment.Offset + segment.Count] = channelId;
             }
 
-            segment = new ArraySegment<byte>(segment.Array, segment.Offset, segment.Count + 1);
+            segment = new ArraySegment<byte>(arr, segment.Offset, segment.Count + 1);
 
             //Set the ID of the connection where we want to send
             eventOptions.TargetActors[0] = connectionId + 1;
