@@ -213,23 +213,9 @@ namespace FishyRealtime
         public override void SendToServer(byte channelId, ArraySegment<byte> segment)
         {
             if (!client.InRoom) return;
-            //Decide what channel to use
-            SendOptions options = channelId == (byte)Channel.Reliable ? SendOptions.SendReliable : SendOptions.SendUnreliable;
-
-            //Sometimes the segment isnt large enough
-            if ((segment.Array.Length - 1) <= (segment.Offset + segment.Count))
-            {
-                byte[] arr = segment.Array;
-                Array.Resize(ref arr, arr.Length + 1);
-                arr[arr.Length - 1] = channelId;
-            }
-            //If it is, just insert a new byte
-            else
-            {
-                segment.Array[segment.Offset + segment.Count] = channelId;
-            }
-
-            segment = new ArraySegment<byte>(segment.Array, segment.Offset, segment.Count + 1);
+            
+            //Append the channel byte and get send options
+            SetChannel(ref segment, out SendOptions options, channelId);
 
             //If we are host, 
             if (NetworkManager.IsHost)
@@ -250,24 +236,10 @@ namespace FishyRealtime
         public override void SendToClient(byte channelId, ArraySegment<byte> segment, int connectionId)
         {
             if (!client.InRoom) return;
-            //Decide what channel to use
-            SendOptions options = channelId == (byte)Channel.Reliable ? SendOptions.SendReliable : SendOptions.SendUnreliable;
 
-            //Sometimes the segment isnt large enough
-            if ((segment.Array.Length - 1) <= (segment.Offset + segment.Count))
-            {
-                byte[] arr = segment.Array;
-                Array.Resize(ref arr, arr.Length + 1);
-                arr[arr.Length - 1] = channelId;
-            }
-            //If it is, just insert a new byte
-            else
-            {
-                segment.Array[segment.Offset + segment.Count] = channelId;
-            }
-
-            segment = new ArraySegment<byte>(segment.Array, segment.Offset, segment.Count + 1);
-
+            //Append the channel byte and get send options
+            SetChannel(ref segment, out SendOptions options, channelId);
+            
             //Set the ID of the connection where we want to send
             eventOptions.TargetActors[0] = connectionId + 1;
 
@@ -308,28 +280,43 @@ namespace FishyRealtime
             {
                 //The data received
                 ArraySegment<byte> data = new ArraySegment<byte>(byteArraySlice.Buffer, byteArraySlice.Offset, byteArraySlice.Count);
-
+                //The channel is "encoded" on the ArraySegment
+                GetChannel(ref data, out Channel channel);
                 if (photonEvent.Sender == client.CurrentRoom.MasterClientId)
                 {
                     //Sent by server
-                    //The channel is "encoded" on the ArraySegment
-                    byte channelId = data[data.Count - 1];
-                    data = new ArraySegment<byte>(byteArraySlice.Buffer, 0, data.Count - 1);
-                    Channel channel = channelId == 0 ? Channel.Reliable : Channel.Unreliable;
                     ClientReceivedDataArgs args = new ClientReceivedDataArgs(data, channel, Index);
                     HandleClientReceivedDataArgs(args);
                 }
                 else
                 {
                     //Sent by client
-                    //The channel is "encoded" on the ArraySegment
-                    byte channelId = data[data.Count - 1];
-                    data = new ArraySegment<byte>(byteArraySlice.Buffer, 0, data.Count - 1);
-                    Channel channel = channelId == 0 ? Channel.Reliable : Channel.Unreliable;
                     ServerReceivedDataArgs args = new ServerReceivedDataArgs(data, channel, photonEvent.Sender - 1, Index);
                     HandleServerReceivedDataArgs(args);
                 }
             }
+        }
+
+        void SetChannel(ref ArraySegment<byte> segment, out SendOptions options, byte channelId)
+        {
+            byte[] array = segment.Array;
+            if (segment.Offset + segment.Count >= array.Length)
+            {
+                Array.Resize(ref array, array.Length + 1);
+                array[^1] = channelId;
+            }
+            else
+            {
+                array[segment.Offset + segment.Count] = channelId;
+            }
+            segment = new ArraySegment<byte>(array, segment.Offset, segment.Count + 1);
+            options = channelId == (byte)Channel.Reliable ? SendOptions.SendReliable : SendOptions.SendUnreliable;
+        }
+
+        void GetChannel(ref ArraySegment<byte> segment, out Channel channel)
+        {
+            channel = (Channel)segment[^1];
+            segment = new(segment.Array, segment.Offset, segment.Count - 1);
         }
 
         //A fake method for receiving data as host
